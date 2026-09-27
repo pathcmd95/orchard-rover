@@ -1,0 +1,21 @@
+# 소스는 /workspace 로 마운트하므로 이미지 빌드 컨텍스트에서 제외
+ros2_ws/build
+ros2_ws/install
+ros2_ws/log
+data
+models
+.git
+**/__pycache__
+docs/media
+# 비밀 정보는 이미지에 넣지 않음
+**/.env
+**/.env.*
+**/*.env
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/credentials*.json
+**/secrets*.json

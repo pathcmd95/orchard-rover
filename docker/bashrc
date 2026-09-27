@@ -1,0 +1,10 @@
+# orchard-rover 컨테이너 대화형 셸 설정
+source /opt/ros/jazzy/setup.bash
+[ -f /opt/px4_ws/install/setup.bash ] && source /opt/px4_ws/install/setup.bash
+[ -f /opt/livox_ws/install/setup.bash ] && source /opt/livox_ws/install/setup.bash
+[ -f /workspace/ros2_ws/install/setup.bash ] && source /workspace/ros2_ws/install/setup.bash
+export PX4_DIR=${PX4_DIR:-/opt/PX4-Autopilot}
+alias cb='cd /workspace/ros2_ws && colcon build --symlink-install && source install/setup.bash'
+alias sim='ros2 launch orchard_bringup sim.launch.py'
+PS1='\[\e[32m\](orchard-rover)\[\e[0m\] \w \$ '
+echo "orchard-rover: 빌드 'cb', 시뮬레이션 'sim' (docs/02 참고)"

@@ -1,0 +1,50 @@
+# docker compose 로 개발/시뮬/실차 컨테이너 실행
+#   PC(시뮬):  docker compose build sim && ./scripts/docker_run.sh sim
+#   Orin(실차): docker compose build robot && ./scripts/docker_run.sh robot
+# NVIDIA GPU PC 는 compose.gpu.yaml, /dev/dri 가 있는 PC 는 compose.dri.yaml 을 함께 사용 (docker_run.sh 가 자동 감지)
+x-common: &common
+  network_mode: host          # ROS 2 DDS, PX4 uXRCE-DDS(UDP 8888), Livox(UDP) 를 그대로 사용
+  ipc: host
+  stdin_open: true
+  tty: true
+  working_dir: /workspace
+  environment:
+    - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    - DISPLAY=${DISPLAY:-}
+    - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}
+    - XDG_RUNTIME_DIR=/tmp/runtime-root
+    - QT_X11_NO_MITSHM=1
+
+services:
+  sim:
+    <<: *common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: sim
+    # 공유받은 완성 이미지를 쓰려면: ORCHARD_IMAGE=orchard-rover:sim-full ./scripts/docker_run.sh sim (docs/08_docker_share.md)
+    image: ${ORCHARD_IMAGE:-orchard-rover:sim}
+    container_name: orchard-sim
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - orchard-cache:/root/.cache/orchard_rover
+
+  robot:
+    <<: *common
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: robot
+    image: orchard-rover:robot
+    container_name: orchard-robot
+    privileged: true            # RealSense(USB), Pixhawk 직렬포트 접근
+    runtime: nvidia             # Jetson GPU (JetPack 의 nvidia-container-runtime)
+    volumes:
+      - .:/workspace
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    restart: "no"
+
+volumes:
+  orchard-cache:

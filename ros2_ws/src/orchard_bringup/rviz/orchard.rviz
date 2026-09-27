@@ -1,0 +1,142 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Reference Frame: base_link
+      Cell Size: 1
+      Plane Cell Count: 20
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: false
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Livox Mid-360
+      Enabled: true
+      Topic:
+        Value: /livox/lidar
+        Reliability Policy: Best Effort
+      Size (m): 0.03
+      Style: Points
+      Color Transformer: AxisColor
+      Axis: Z
+      Decay Time: 0
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Trunks / Rows
+      Enabled: true
+      Topic:
+        Value: /orchard/markers
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Orchard Map (열-나무 번호, 결주)
+      Enabled: true
+      Topic:
+        Value: /orchard/map/markers
+    - Class: rviz_default_plugins/Image
+      Name: Fusion (LiDAR→Camera)
+      Enabled: true
+      Topic:
+        Value: /orchard/debug/fusion
+        Reliability Policy: Best Effort
+    - Class: rviz_default_plugins/Image
+      Name: Segmentation (drivable)
+      Enabled: true
+      Topic:
+        Value: /orchard/debug/seg
+        Reliability Policy: Best Effort
+    - Class: rviz_default_plugins/Path
+      Name: U-turn plan
+      Enabled: true
+      Topic:
+        Value: /orchard/turn_path
+      Color: 0; 220; 255
+      Line Style: Billboards
+      Line Width: 0.08
+      Alpha: 1
+    - Class: rviz_default_plugins/Map
+      Name: U-turn search grid (Hybrid A*)
+      Enabled: true
+      Topic:
+        Value: /orchard/plan/turn_grid
+      Alpha: 0.25
+      Color Scheme: costmap
+      Draw Behind: true
+    - Class: rviz_default_plugins/Path
+      Name: Global path (planner)
+      Enabled: true
+      Topic:
+        Value: /orchard/global_path
+      Color: 60; 230; 90
+      Line Style: Billboards
+      Line Width: 0.10
+      Alpha: 0.9
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Orchard model (rows, lanes, state)
+      Enabled: true
+      Topic:
+        Value: /orchard/plan/markers
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Local planner (DWA candidates, obstacles, footprint)
+      Enabled: true
+      Topic:
+        Value: /orchard/local/markers
+    - Class: rviz_default_plugins/Path
+      Name: Local path (DWA best)
+      Enabled: true
+      Topic:
+        Value: /orchard/local_path
+      Color: 255; 230; 0
+      Line Style: Billboards
+      Line Width: 0.06
+      Alpha: 1
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Voxel map (start frame)
+      Enabled: true
+      Topic:
+        Value: /orchard/voxel_map
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Trunk map (YOLO=orange)
+      Enabled: true
+      Topic:
+        Value: /orchard/trunk_map
+    - Class: rviz_default_plugins/Path
+      Name: Start-frame path
+      Enabled: true
+      Topic:
+        Value: /orchard/start_path
+      Color: 40; 80; 220
+      Line Style: Billboards
+      Line Width: 0.06
+      Alpha: 1
+    - Class: rviz_default_plugins/Odometry
+      Name: Odom (PX4)
+      Enabled: true
+      Topic:
+        Value: /odom
+      Keep: 50
+      Shape:
+        Value: Arrow
+  Global Options:
+    Fixed Frame: odom
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Target Frame: base_link
+      Scale: 40
+      Angle: 0
+      X: 0
+      Y: 0
+      Near Clip Distance: 0.01
+      Invert Z Axis: false
+    Saved: ~
+Window Geometry:
+  Height: 900
+  Width: 1400

@@ -1,0 +1,53 @@
+# 과수원 로버 기하 설정 — URDF(xacro)와 Gazebo 모델 생성기가 모두 이 파일을 읽는다.
+# 센서 장착 위치를 바꾸려면 여기만 고치면 시뮬레이션과 TF 가 함께 바뀐다.
+# 좌표: base_link 기준 [m], [rad]  (x 전방, y 왼쪽, z 위)
+#
+# 읽는 곳
+#   - urdf/orchard_rover.urdf.xacro   → robot_state_publisher 가 발행하는 센서 TF
+#   - orchard_gazebo 모델 생성기       → Gazebo 로버 모델(센서 위치·사양)
+# 값을 바꾼 뒤: ./scripts/build_ws.sh 로 다시 빌드하고 launch 를 다시 띄우면 반영된다.
+# xyz = [x, y, z] 위치 [m], rpy = [roll, pitch, yaw] 회전 [rad] (pitch 양수 = 앞쪽이 아래로 기울어짐)
+
+# --- 차체 ---
+vehicle:
+  # 시뮬레이션 차체는 PX4 rover_ackermann 모델(휠베이스 0.5 m, 윤거 0.6 m)을 사용한다.
+  # 실차 치수가 확정되면 PX4 파라미터(RA_WHEEL_BASE 등)와 함께 수정할 것.
+  wheelbase: 0.5            # 앞·뒤 차축 사이 거리 [m] (PX4 RA_WHEEL_BASE 와 같게)
+  track: 0.6                # 좌·우 바퀴 사이 거리(윤거) [m]
+  wheel_radius: 0.1         # 바퀴 반지름 [m]
+  base_height: 0.1          # 지면 ~ base_link 높이 (평지 기준)
+  body: [1.0, 0.5, 0.1]     # 시각화용 박스 [길이, 폭, 높이]
+  max_steer_angle: 0.5236   # 30도
+
+# --- 센서 장착 위치와 시뮬레이션 사양 ---
+sensors:
+  livox:                    # Livox Mid-360 (FOV 360° x 59°, 수직 -7° ~ +52°)
+    frame: livox_frame      # TF 프레임 이름 (실차 드라이버 frame_id 와 같아야 함)
+    xyz: [0.30, 0.0, 0.50]
+    rpy: [0.0, 0.0, 0.0]
+    sim:                    # Gazebo gpu_lidar 센서 설정 (시뮬 전용)
+      rate: 10              # 스캔 주기 [Hz] (실차 드라이버 publish_freq 10 Hz 와 같게)
+      horizontal_samples: 720   # 수평 방향 광선 수 (360° / 720 = 0.5° 간격)
+      vertical_samples: 64      # 수직 방향 광선 수. 늘리면 점이 촘촘해지지만 느려짐
+      vertical_min_deg: -7.0
+      vertical_max_deg: 52.0
+      range_min: 0.1        # 최소 측정 거리 [m]
+      range_max: 40.0       # 최대 측정 거리 [m] (Mid-360 사양 약 40 m @10% 반사율)
+      noise_stddev: 0.02    # Mid-360 거리 정확도 ≤2 cm (1σ)
+  camera:                   # RealSense D455
+    frame: camera_link      # 카메라 몸체 프레임 (x 전방)
+    optical_frame: camera_color_optical_frame   # 광학 프레임 (z 전방, x 오른쪽, y 아래 — 영상 좌표계)
+    xyz: [0.45, 0.0, 0.40]
+    rpy: [0.0, 0.10, 0.0]   # 약 6° 아래로
+    sim:                    # Gazebo 카메라 설정 (시뮬 전용)
+      rate: 15              # 프레임 속도 [Hz] (실차 848x480@15 와 같은 주기)
+      width: 640            # 영상 크기 [px]
+      height: 480
+      hfov_deg: 90.0        # D455 RGB 수평 화각
+      near: 0.3             # 렌더링 최소/최대 거리 [m]
+      far: 30.0
+      depth_near: 0.6       # D455 이상 거리 0.6~6 m
+      depth_far: 10.0
+  gps:
+    frame: gps_link         # GPS 안테나 위치 (PX4 GPS 오프셋과 맞출 것)
+    xyz: [0.0, 0.0, 0.30]

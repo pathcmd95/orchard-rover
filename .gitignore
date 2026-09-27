@@ -1,0 +1,39 @@
+# ROS 2 빌드 산출물
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+# 데이터/모델 (용량이 크므로 git 대신 드라이브 등으로 공유. 배포용 모델은 git add -f 로 따로 올림)
+data/
+models/*.onnx
+models/*.pt
+runs/
+*.bag
+*.mcap
+*.db3
+# 파이썬
+__pycache__/
+*.pyc
+.pytest_cache/
+# 편집기
+.vscode/
+.idea/
+*.swp
+.DS_Store
+# PX4 펌웨어 빌드 결과
+firmware/
+dist/
+# 개인 설정·비밀 정보 (API 키·토큰·비밀번호·인증서·계정 정보) — 실수로 commit 되지 않도록
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials*.json
+secrets*.json
+# 사내망 CA 인증서 등 개인 환경 인증서 (폴더만 유지)
+docker/certs/*
+!docker/certs/.gitkeep

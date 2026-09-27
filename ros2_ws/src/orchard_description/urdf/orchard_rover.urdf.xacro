@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<!-- 과수원 로버 TF 트리. 치수는 config/rover.yaml 에서 읽는다. -->
+<!--
+  역할: base_link 아래에 센서 프레임(LiDAR, 카메라, GPS)을 고정 조인트로 붙인 URDF.
+        launch/description.launch.py 가 'xacro orchard_rover.urdf.xacro sim:=<true|false>' 로 변환해
+        robot_state_publisher 에 넘기면 /tf_static 으로 발행된다.
+  TF 트리
+    base_link ─┬─ livox_frame                     (Livox Mid-360)
+               ├─ camera_link ── camera_color_optical_frame   (RealSense D455, 광학 프레임은 sim 일 때만)
+               └─ gps_link
+  (odom → base_link 는 px4_state_node 가 발행한다.)
+  센서 위치를 바꾸려면 이 파일이 아니라 config/rover.yaml 의 xyz/rpy 를 고칠 것.
+  단독 확인: xacro orchard_rover.urdf.xacro sim:=true > /tmp/rover.urdf && check_urdf /tmp/rover.urdf
+-->
+<robot name="orchard_rover" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- sim: true 면 카메라 광학 프레임 TF 를 여기서 발행 (실차는 카메라 드라이버가 발행) -->
+  <xacro:arg name="sim" default="false"/>
+  <!-- rover.yaml 을 읽어 파이썬 dict 처럼 쓴다: cfg['vehicle'], cfg['sensors']['livox'] ... -->
+  <xacro:property name="cfg" value="${xacro.load_yaml('$(find orchard_description)/config/rover.yaml')}"/>
+  <xacro:property name="veh" value="${cfg['vehicle']}"/>
+  <xacro:property name="lidar" value="${cfg['sensors']['livox']}"/>
+  <xacro:property name="cam" value="${cfg['sensors']['camera']}"/>
+  <xacro:property name="gps" value="${cfg['sensors']['gps']}"/>
+
+  <!-- 차체 기준 프레임. RViz 표시용 흰색 박스 (크기 = rover.yaml vehicle.body [길이, 폭, 높이]) -->
+  <link name="base_link">
+    <visual>
+      <geometry><box size="${veh['body'][0]} ${veh['body'][1]} ${veh['body'][2]}"/></geometry>
+      <material name="white"><color rgba="0.9 0.9 0.9 1"/></material>
+    </visual>
+  </link>
+
+  <!-- Livox Mid-360 LiDAR: 표시용 원통(지름 약 6.6 cm, 높이 6 cm), 위치는 rover.yaml sensors.livox -->
+  <link name="${lidar['frame']}">
+    <visual>
+      <geometry><cylinder radius="0.033" length="0.06"/></geometry>
+      <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+    </visual>
+  </link>
+  <!-- fixed 조인트: 움직이지 않는 장착 → /tf_static 으로 한 번만 발행 -->
+  <joint name="livox_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="${lidar['frame']}"/>
+    <origin xyz="${lidar['xyz'][0]} ${lidar['xyz'][1]} ${lidar['xyz'][2]}"
+            rpy="${lidar['rpy'][0]} ${lidar['rpy'][1]} ${lidar['rpy'][2]}"/>
+  </joint>
+
+  <!-- RealSense D455 몸체 프레임 (x 전방). 표시용 박스 크기는 D455 외형 치수 [m] -->
+  <link name="${cam['frame']}">
+    <visual>
+      <geometry><box size="0.03 0.124 0.029"/></geometry>
+      <material name="gray"><color rgba="0.3 0.3 0.3 1"/></material>
+    </visual>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="${cam['frame']}"/>
+    <origin xyz="${cam['xyz'][0]} ${cam['xyz'][1]} ${cam['xyz'][2]}"
+            rpy="${cam['rpy'][0]} ${cam['rpy'][1]} ${cam['rpy'][2]}"/>
+  </joint>
+
+  <!-- 실차에서는 realsense2_camera 드라이버가 camera_link 아래 광학 프레임 TF 를 직접 발행한다 -->
+  <!-- 광학 프레임 규약(REP 103): z 전방, x 오른쪽, y 아래. rpy(-90°, 0, -90°) 로 몸체 프레임에서 변환 -->
+  <xacro:if value="$(arg sim)">
+    <link name="${cam['optical_frame']}"/>
+    <joint name="camera_optical_joint" type="fixed">
+      <parent link="${cam['frame']}"/>
+      <child link="${cam['optical_frame']}"/>
+      <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    </joint>
+  </xacro:if>
+
+  <!-- GPS 안테나 위치 (표시용 모양 없음) -->
+  <link name="${gps['frame']}"/>
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="${gps['frame']}"/>
+    <origin xyz="${gps['xyz'][0]} ${gps['xyz'][1]} ${gps['xyz'][2]}" rpy="0 0 0"/>
+  </joint>
+</robot>

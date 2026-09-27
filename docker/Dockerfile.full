@@ -1,0 +1,19 @@
+# 학생 배포용 '완성' 이미지: sim 이미지 + 이 저장소 코드·모델을 넣고 ROS 워크스페이스까지 빌드해 둔 것.
+#   저장소를 받지 않아도 컨테이너 하나로 바로 시뮬레이션을 돌릴 수 있다 (코드를 고치려면 저장소를 /workspace 로 마운트).
+#
+# 빌드 (먼저 orchard-rover:sim 이 있어야 함 — scripts/docker_build.sh sim)
+#   ./scripts/docker_share.sh build-full          # → orchard-rover:sim-full
+# 이 파일 전용 제외 목록은 docker/Dockerfile.full.dockerignore (models/ 는 포함, data/·빌드 산출물은 제외)
+ARG BASE=orchard-rover:sim
+FROM ${BASE}
+
+# 저장소 내용을 /workspace 에 복사 (compose 로 저장소를 마운트하면 이 복사본 위에 덮여 보인다)
+COPY . /workspace
+
+# ROS 2 워크스페이스 빌드 (px4_msgs 는 이미지의 /opt/px4_ws 에 이미 있음)
+RUN source /opt/ros/jazzy/setup.bash && source /opt/px4_ws/install/setup.bash \
+    && cd /workspace/ros2_ws && colcon build --symlink-install --event-handlers console_direct+ \
+    && rm -rf /workspace/ros2_ws/log
+
+WORKDIR /workspace
+CMD ["bash"]

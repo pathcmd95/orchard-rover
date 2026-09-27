@@ -1,0 +1,16 @@
+# NVIDIA 그래픽카드가 있는 x86 PC 용 추가 설정 (NVIDIA Container Toolkit 필요)
+#   docker compose -f compose.yaml -f compose.gpu.yaml run --rm sim
+services:
+  sim:
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - __NV_PRIME_RENDER_OFFLOAD=1
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

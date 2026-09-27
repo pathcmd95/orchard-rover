@@ -1,0 +1,67 @@
+# ros_gz_bridge 설정: Gazebo 센서 토픽 → 실차와 같은 ROS 토픽 이름
+# (시뮬/실차에서 인식·주행 노드를 그대로 쓰기 위함)
+#
+# sim.launch.py 가 ros_gz_bridge parameter_bridge 노드에 config_file 로 넘긴다.
+# 항목 하나 = 토픽 하나. 각 필드 의미:
+#   ros_topic_name  ROS 2 쪽 토픽 이름 (인식 노드가 구독하는 이름)
+#   gz_topic_name   Gazebo 쪽 토픽 이름 (`gz topic -l` 로 확인 가능)
+#   ros_type_name   ROS 2 메시지 타입
+#   gz_type_name    Gazebo 메시지 타입 (ROS 타입과 짝이 맞아야 변환됨)
+#   direction       GZ_TO_ROS(Gazebo→ROS) | ROS_TO_GZ | BIDIRECTIONAL
+# 새 센서를 추가하면 여기에 항목을 추가하고, Gazebo 토픽 이름은 모델 생성기(orchard_gazebo)와 맞춘다.
+# 참고: PX4 제어 토픽(/fmu/...)은 이 브리지가 아니라 Micro XRCE-DDS Agent 가 담당한다.
+
+# 시뮬 시간: use_sim_time:=true 인 모든 노드가 이 /clock 을 기준으로 동작
+- ros_topic_name: /clock
+  gz_topic_name: /clock
+  ros_type_name: rosgraph_msgs/msg/Clock
+  gz_type_name: gz.msgs.Clock
+  direction: GZ_TO_ROS
+
+# Livox Mid-360 (실차: livox_ros_driver2 → /livox/lidar)
+- ros_topic_name: /livox/lidar
+  gz_topic_name: /livox/lidar/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
+# RealSense D455 (실차: realsense2_camera, camera_namespace:='' camera_name:=camera)
+# 컬러 영상
+- ros_topic_name: /camera/color/image_raw
+  gz_topic_name: /camera/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+# 카메라 내부 파라미터 (초점거리·주점) — 영상 ↔ 3D 투영에 사용
+- ros_topic_name: /camera/color/camera_info
+  gz_topic_name: /camera/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
+# 깊이 영상 (실차는 align_depth 로 컬러 좌표에 맞춘 깊이)
+- ros_topic_name: /camera/aligned_depth_to_color/image_raw
+  gz_topic_name: /camera/depth_image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+
+# 세그멘테이션 정답 라벨 (시뮬 전용, sim.launch seg_camera:=true 일 때만 발행됨)
+# labels_map: 픽셀값 = 클래스 번호 (orchard_perception/seg_classes.py), colored_map: 사람이 보기 위한 색 영상
+- ros_topic_name: /camera/segmentation/labels_map
+  gz_topic_name: /camera/segmentation/labels_map
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+- ros_topic_name: /camera/segmentation/colored_map
+  gz_topic_name: /camera/segmentation/colored_map
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+
+# 평가용 정답 위치 (시뮬 전용)
+# lane_error_monitor 가 이 값으로 통로 중심선 횡오차를 계산한다 (주행 제어에는 쓰지 않음)
+- ros_topic_name: /ground_truth/odom
+  gz_topic_name: /model/orchard_rover/odometry
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: gz.msgs.Odometry
+  direction: GZ_TO_ROS

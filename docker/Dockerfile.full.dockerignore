@@ -1,0 +1,24 @@
+# docker/Dockerfile.full 전용 제외 목록 (BuildKit 이 '<Dockerfile 이름>.dockerignore' 를 우선 사용)
+# 기본 .dockerignore 와 달리 models/ 는 넣는다 (학습된 세그멘테이션·YOLO ONNX 를 이미지에 포함)
+ros2_ws/build
+ros2_ws/install
+ros2_ws/log
+data
+.git
+**/__pycache__
+**/.pytest_cache
+models/*.pt
+scripts/demo.env
+docs/media
+# 비밀 정보는 이미지에 넣지 않음
+**/.env
+**/.env.*
+**/*.env
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/credentials*.json
+**/secrets*.json

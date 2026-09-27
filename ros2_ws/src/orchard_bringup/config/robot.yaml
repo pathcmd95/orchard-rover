@@ -1,0 +1,119 @@
+# 실차(Jetson Orin) 파라미터. 처음 필드 투입 전 반드시 docs/03_robot_orin.md 체크리스트 확인.
+#
+# 구조: 최상위 키 = 노드 이름, 그 아래 ros__parameters: (sim.yaml 과 같은 형식)
+# ★ 표시 = 실차 치수/설치 상태에 맞게 반드시 실측해서 고칠 값
+# 실차는 실제 시간을 쓰므로 use_sim_time 을 적지 않는다(기본 false).
+# 안전: auto_start / auto_offboard / auto_arm 은 모두 false. 사람이 조종기·서비스로 시작한다.
+
+# --- LiDAR 인식: 지면 추정 → 줄기 검출 → 행(통로) 중심선 → 통로 장애물 ---
+lidar_tree_node:
+  ros__parameters:
+    input_topic: /livox/lidar       # livox_ros_driver2 가 발행하는 PointCloud2
+    ground.nominal_z: -0.35         # ★ 실차 base_link 높이에 맞게 수정 (지면 기준 -높이)
+    # 차체 자기 점 제거 박스 [m, base_link 기준]: 이 안의 점(차체·바퀴·지지대)은 버린다
+    self_filter.x_min: -1.0         # ★ 실차 차체 크기에 맞게 수정
+    self_filter.x_max: 1.0
+    self_filter.y_abs_max: 0.6      # 좌우 |y| 한계 (차폭의 절반 + 여유)
+    # 줄기 검출 높이 밴드 [m, 지면 기준]
+    trunk.band_min: 0.25            # 잔디 5~15 cm 보다 높게
+    trunk.band_max: 0.7             # 수관 시작 높이보다 낮게 (품종별 조정)
+    row.expected_width: 3.8         # 울산 애플팜 행간거리
+    obstacle.half_width: 0.6        # 통로 장애물 검사 폭의 절반 [m] (차폭/2 + 여유)
+
+# --- 카메라 YOLO 줄기 검출 ---
+camera_tree_node:
+  ros__parameters:
+    image_topic: /camera/color/image_raw
+    model_path: /workspace/models/trunk_yolo.onnx   # tools/training/train_yolo.py 결과물
+    use_cuda: false                 # OpenCV 가 CUDA 로 빌드된 경우에만 true
+    max_rate_hz: 5.0                # 추론 최대 빈도 [Hz] — Orin CPU/GPU 부하 조절
+
+# --- LiDAR ↔ 카메라 융합, 현장 YOLO 학습 데이터 자동 라벨링 ---
+tree_fusion_node:
+  ros__parameters:
+    image_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    record_dataset: false           # 현장 데이터 수집 시 true
+    dataset_dir: /workspace/data/orchard_dataset_field
+
+# --- 미션 상태기계 (행 추종 · U턴) ---
+row_navigator_node:
+  ros__parameters:
+    auto_start: false               # 실차는 반드시 사람이 서비스로 시작
+    mission.lanes: 1                # 0 = 탐사 모드 (통로 수를 모르고 끝 열까지)
+    mission.row_spacing: 3.8        # 행간 거리 [m]
+    mission.turn_mode: planned      # planned: LiDAR 입구 + Dubins 경로 / arc: 반원
+    follow.cruise_speed: 0.5        # 통로 주행 속도 [m/s] — 처음엔 낮게 시작해 점차 올릴 것
+    follow.lookahead: 2.5           # 전방 주시 거리 [m]
+    follow.min_turn_radius: 1.5     # ★ 실차 휠베이스/조향각으로 계산
+    follow.stop_distance: 1.5       # 통로 장애물이 이 거리 [m] 안이면 정지
+
+# --- /cmd_vel → PX4 Offboard ---
+px4_offboard_bridge:
+  ros__parameters:
+    auto_offboard: false            # 실차: 조종기 스위치로 Offboard 전환
+    auto_arm: false                 # 실차: 조종기로 시동
+    max_speed: 0.8                  # PX4 로 보내는 속도 상한 [m/s] (안전 제한)
+
+# --- PX4 위치/자세 → /odom, odom→base_link TF ---
+px4_state_node:
+  ros__parameters:
+    publish_tf: true
+
+# --- 나무 지도 누적·저장 ---
+orchard_mapper_node:
+  ros__parameters:
+    row_spacing: 3.8
+    max_range: 8.0                  # 이 거리 [m] 안의 줄기만 지도에 넣음 (먼 검출은 부정확)
+    output_dir: /workspace/data/maps
+    autosave_period: 30.0           # 주기 저장 간격 [s] (0 이면 끔)
+
+# --- 카메라 세그멘테이션 → 카메라 기반 통로 중심선 ---
+seg_path_node:
+  ros__parameters:
+    model_path: /workspace/models/orchard_seg.onnx   # 현장 데이터로 미세조정한 모델 권장
+    use_cuda: true                  # Orin GPU 사용
+    ground_z: -0.1                  # 실측 base_link 높이에 맞출 것
+    min_period: 0.1                 # 처리 최소 간격 [s] (0.1 = 최대 10 Hz)
+
+# --- 복셀 맵 + 과수 줄기 매핑 (orchard_mapping/voxel_map_node) ---
+#   YOLO 줄기 박스 → 복셀 맵에서 줄기 기둥 확인 → 등록 줄기와 매칭 → 출발점 기준 상대좌표로 저장
+#   좌표 'start': 원점 = 미션 시작 위치, +x = 처음 곧게 달린 방향 (course_distance), +z = 위
+voxel_map_node:
+  ros__parameters:
+    voxel_size: 0.1                 # 복셀 한 변 [m]
+    integrate_period: 0.2           # 스캔 누적 간격 [s] (작을수록 촘촘하지만 무거움)
+    max_range: 15.0                 # 이보다 먼 점은 버림 [m]
+    origin_trigger: mission_start   # mission_start: 미션 시작 순간을 (0,0,0) / first_odom: 노드 시작 순간
+    course_distance: 1.5            # 출발 후 이만큼 직진한 방향을 +x 로 [m]
+    axis_source: course         # +x 축: row_frame = 전역 계획 통로 방향(nav_mode planner) / course = 처음 달린 방향
+    axis_wait: 20.0                # row_frame 을 이 시간 [s] 기다리다 안 오면 course 로
+    detection_source: auto          # auto: YOLO 검출이 오면 YOLO, 없으면 LiDAR 줄기 / yolo / lidar
+    min_conf: 0.35                  # YOLO 점수 하한
+    trunk.band_min: 0.15            # 줄기로 볼 높이 띠 [m, 지면 위]. 수관·처진 가지가 낮으면 band_max 를 낮출 것
+    trunk.band_max: 0.7
+    assoc_radius: 0.4               # 같은 줄기로 합칠 거리 [m] (주간 거리의 1/3 정도)
+    min_hits: 3                     # 이만큼 관측돼야 확정 줄기로 저장
+    display_max_voxels: 80000       # RViz 표시 복셀 상한 (맥 소프트웨어 렌더링은 작게)
+    output_dir: /workspace/data/voxel_maps   # 컨테이너 안 → 호스트 저장소 data/voxel_maps
+    autosave_period: 60.0           # [s] 주기 저장
+
+# --- 전역 경로계획 (nav_mode:=planner 일 때만. 실차 기본은 row — 현장 검증 후 바꿀 것) ---
+global_planner_node:
+  ros__parameters:
+    auto_start: false               # 실차는 반드시 사람이 서비스로 시작
+    plan.lanes: 1                   # 0 = 탐사
+    plan.first_turn: left
+    plan.row_spacing: 3.8           # ★ 과수원 열 간격 실측
+    plan.min_turn_radius: 0.9       # ★ 실차 최소 회전반경 실측
+    plan.robot_radius: 0.45         # ★ 실차 크기
+
+# --- 지역 경로계획 (nav_mode:=planner) ---
+local_planner_node:
+  ros__parameters:
+    obstacle.h_min: 0.2
+    obstacle.h_max: 0.75            # ★ 실차 높이 + 여유
+    obstacle.nominal_ground_z: -0.35   # ★ lidar_tree_node ground.nominal_z 와 같게
+    dwa.max_speed: 0.5              # 처음엔 낮게
+    dwa.safety: 0.2
+    dwa.escape_speed: 0.1           # 장애물에 붙었을 때 빠져나오는 속도 (실차는 낮게)

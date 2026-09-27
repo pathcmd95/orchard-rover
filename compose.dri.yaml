@@ -1,0 +1,6 @@
+# Intel/AMD(또는 NVIDIA) GPU 의 /dev/dri 를 컨테이너에 연결 (Gazebo 렌더링 가속)
+# docker_run.sh 가 /dev/dri 가 있을 때만 자동으로 붙인다.
+services:
+  sim:
+    devices:
+      - /dev/dri:/dev/dri

@@ -1,0 +1,153 @@
+# 시뮬레이션(Gazebo) 파라미터. 실차 값은 robot.yaml 참고.
+#
+# 구조: 최상위 키 = 노드 이름 (autonomy.launch.py 의 Node name 과 같아야 적용됨)
+#       그 아래 ros__parameters: 에 파라미터를 적는다.
+# 여기 없는 파라미터는 각 노드 소스의 declare_parameter 기본값이 쓰인다.
+# 일부 값(row_spacing, lanes, first_turn, model_path)은 sim.launch.py 인자로 덮어쓸 수 있다.
+# use_sim_time: true → 모든 노드가 Gazebo 의 /clock(시뮬 시간)을 쓴다. 시뮬에서는 반드시 true.
+
+# --- LiDAR 인식: 지면 추정 → 줄기 검출 → 행(통로) 중심선 추정 → 통로 장애물 검출 ---
+lidar_tree_node:
+  ros__parameters:
+    use_sim_time: true
+    input_topic: /livox/lidar       # 점군 토픽 (bridge.yaml 이 Gazebo LiDAR 를 이 이름으로 바꿔 줌)
+    ground.nominal_z: -0.1          # PX4 rover_ackermann: base_link 가 지면 위 0.1 m
+    # 줄기 검출 높이 밴드 [m, 지면 기준]: 이 높이 사이에 있는 점만 줄기 후보로 본다
+    trunk.band_min: 0.25            # 잔디보다 높게
+    trunk.band_max: 0.7             # 수관(가지·잎) 시작보다 낮게
+    row.expected_width: 3.8         # 예상 행간 거리 [m]. 월드 row_spacing 과 같아야 함 (launch 인자로 덮어씀)
+    obstacle.half_width: 0.5        # 통로 장애물 검사 폭의 절반 [m] (중심선 ±0.5 m 안의 물체를 장애물로 봄)
+    obstacle.h_max: 0.75            # 차체 높이(라이다 윗면 약 0.65 m)+10 cm. 이보다 높은 처진 가지·잎은 통과 가능
+
+# --- 카메라 YOLO 줄기 검출 (ONNX 모델이 있을 때만 동작) ---
+camera_tree_node:
+  ros__parameters:
+    use_sim_time: true
+    image_topic: /camera/color/image_raw
+    model_path: ''                  # 학습한 ONNX 경로 (예: /workspace/models/trunk_yolo.onnx)
+    input_size: 320                 # 학습 imgsz 와 같게 (camera_lite 320×240 영상으로 학습 → 320)
+    conf_threshold: 0.3             # 시뮬 데이터가 적은 초기 모델은 점수가 낮아 0.3 으로 (현장 모델은 0.35~0.5)
+    use_cuda: false                 # OpenCV DNN 을 CUDA 로 돌릴지 (시뮬 컨테이너는 보통 false)
+
+# --- LiDAR 줄기 ↔ 카메라 영상 융합, YOLO 학습 데이터 자동 라벨링 ---
+tree_fusion_node:
+  ros__parameters:
+    use_sim_time: true
+    image_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    record_dataset: false           # true 면 영상 + LiDAR 로 만든 YOLO 라벨 저장 (launch 인자 record_dataset)
+    dataset_dir: /workspace/data/orchard_dataset_sim   # 저장 폴더 (컨테이너 경로 → 호스트 저장소 data/)
+
+# --- 미션 상태기계: 행 추종 → 행 끝 이탈 → U턴 → 다음 통로 진입 ... ---
+row_navigator_node:
+  ros__parameters:
+    use_sim_time: true
+    auto_start: true                # 시뮬: 행 인식 + odom 이 들어오면 자동으로 미션 시작 (실차는 false)
+    auto_start_delay: 5.0           # 자동 시작 전 대기 [s, 시뮬 시간]
+    row_timeout: 1.5                # 시뮬 시간 기준. 느린 PC(RTF 수 %)에서 LiDAR 프레임 간격이 벌어져도 끊김으로 보지 않게
+    mission.lanes: 3                # 주행할 통로 수. 0 = 탐사 모드 (launch 인자 lanes 로 덮어씀)
+    mission.first_turn: left        # 첫 U턴 방향 left | right
+    mission.row_spacing: 3.8        # 행간 거리 [m] — U턴 경로 계산에 사용
+    mission.turn_mode: planned      # planned: 행 끝에서 LiDAR 로 다음 통로 입구를 잡고 Dubins 경로 추종 / arc: 반원(예전)
+    # 행 추종 제어 (pure pursuit 계열)
+    follow.cruise_speed: 0.8        # 통로 주행 속도 [m/s]
+    follow.lookahead: 2.5           # 전방 주시 거리 [m]. 크면 부드럽지만 반응이 늦고, 작으면 민감(흔들림)
+    follow.min_turn_radius: 0.9     # 0.5 / tan(30°)
+
+# --- ROS /cmd_vel → PX4 Offboard 명령 ---
+px4_offboard_bridge:
+  ros__parameters:
+    use_sim_time: true
+    auto_offboard: true             # 시뮬에서는 자동으로 Offboard 전환 + 시동
+    auto_arm: true
+    max_speed: 1.5                  # PX4 로 보내는 속도 상한 [m/s]
+
+# --- PX4 위치/자세 → /odom, odom→base_link TF ---
+px4_state_node:
+  ros__parameters:
+    use_sim_time: true
+    publish_tf: true                # odom → base_link TF 발행 (다른 노드가 TF 로 로버 위치를 씀)
+
+# --- 평가용: Gazebo 정답 위치로 통로 중심선 횡오차 측정 (시뮬 전용) ---
+lane_error_monitor:
+  ros__parameters:
+    use_sim_time: true
+
+# --- 나무 지도(줄기 위치) 누적·저장 ---
+orchard_mapper_node:
+  ros__parameters:
+    use_sim_time: true
+    row_spacing: 3.8                # 행간 거리 [m] (launch 인자 row_spacing 으로 덮어씀)
+    output_dir: /workspace/data/maps    # 컨테이너 안 → 호스트 저장소 data/maps
+    autosave_period: 30.0               # 실행 중 주기 저장 (컨테이너가 갑자기 멈춰도 지도 남김)
+
+# --- 카메라 세그멘테이션(주행가능 영역) → 카메라 기반 통로 중심선 ---
+seg_path_node:
+  ros__parameters:
+    use_sim_time: true
+    model_path: /workspace/models/orchard_seg.onnx   # 없으면 카메라 중심선 끔 (LiDAR 만)
+    ground_z: -0.1                  # base_link 기준 지면 높이 [m] (lidar_tree_node ground.nominal_z 와 같게)
+    min_period: 0.3                 # 처리 최소 간격 [s, 벽시계]. 클수록 CPU 부하 감소
+
+# --- (record_seg:=true 일 때만 실행) 세그멘테이션 학습 데이터 수집 ---
+seg_dataset_node:
+  ros__parameters:
+    use_sim_time: true
+    dataset_dir: /workspace/data/seg_dataset_sim   # images/*.jpg + labels/*.png 저장
+    period: 1.0                     # 저장 간격 [s, 시뮬 시간]
+
+# --- 복셀 맵 + 과수 줄기 매핑 (orchard_mapping/voxel_map_node) ---
+#   YOLO 줄기 박스 → 복셀 맵에서 줄기 기둥 확인 → 등록 줄기와 매칭 → 출발점 기준 상대좌표로 저장
+#   좌표 'start': 원점 = 미션 시작 위치, +x = 처음 곧게 달린 방향 (course_distance), +z = 위
+voxel_map_node:
+  ros__parameters:
+    use_sim_time: true
+    voxel_size: 0.1                 # 복셀 한 변 [m]
+    integrate_period: 0.5           # 스캔 누적 간격 [s] (작을수록 촘촘하지만 무거움)
+    max_range: 15.0                 # 이보다 먼 점은 버림 [m]
+    origin_trigger: mission_start   # mission_start: 미션 시작 순간을 (0,0,0) / first_odom: 노드 시작 순간
+    course_distance: 1.5            # 출발 후 이만큼 직진한 방향을 +x 로 [m]
+    axis_source: row_frame      # +x 축: row_frame = 전역 계획 통로 방향(nav_mode planner) / course = 처음 달린 방향
+    axis_wait: 20.0                # row_frame 을 이 시간 [s] 기다리다 안 오면 course 로
+    detection_source: auto          # auto: YOLO 검출이 오면 YOLO, 없으면 LiDAR 줄기 / yolo / lidar
+    min_conf: 0.35                  # YOLO 점수 하한
+    trunk.band_min: 0.15            # 줄기로 볼 높이 띠 [m, 지면 위]. 수관·처진 가지가 낮으면 band_max 를 낮출 것
+    trunk.band_max: 0.7
+    assoc_radius: 0.4               # 같은 줄기로 합칠 거리 [m] (주간 거리의 1/3 정도)
+    min_hits: 3                     # 이만큼 관측돼야 확정 줄기로 저장
+    display_max_voxels: 40000       # RViz 표시 복셀 상한 (맥 소프트웨어 렌더링은 작게)
+    output_dir: /workspace/data/voxel_maps   # 컨테이너 안 → 호스트 저장소 data/voxel_maps
+    autosave_period: 60.0           # [s] 주기 저장
+
+# --- 전역 경로계획 (nav_mode:=planner, 기본): 통로 순회 + 헤드랜드 U턴 Hybrid A* + odom 흐름 보정 ---
+global_planner_node:
+  ros__parameters:
+    use_sim_time: true
+    auto_start: true                # 시뮬: odom + 통로 인식이 auto_start_delay 동안 계속되면 자동 시작 (실차 false)
+    auto_start_delay: 5.0
+    row_timeout: 1.5                # 느린 PC(RTF 수 %) 에서 LiDAR 간격이 벌어져도 끊김으로 보지 않게
+    plan.lanes: 3                   # 돌 통로 수. 0 = 탐사 (launch 인자 lanes 로 덮어씀)
+    plan.first_turn: left           # 첫 U턴 방향 left | right
+    plan.row_spacing: 3.8           # 파라미터 열 간격 [m] (측정 전·못 볼 때, launch 인자 row_spacing 으로 덮어씀)
+    plan.min_turn_radius: 0.9       # 차의 최소 회전반경 [m] (0.5 / tan 30°). U턴 반경 = max(이 값, 측정 간격/2)
+    plan.exit_margin: 0.8           # 통로 끝 = 마지막 줄기 + 이만큼 [m] (여기서 U턴 시작)
+    plan.entry_margin: 0.8          # 다음 통로 입구 = 그 통로 마지막 줄기 + 이만큼 바깥 [m]
+    plan.tree_radius: 0.25          # U턴 충돌 검사용 줄기 + 낮은 가지 반경 [m]
+    plan.robot_radius: 0.45         # 로버를 감싸는 원 반경 [m]
+    plan.drift_gain: 0.2            # odom 흐름 추정 갱신 비율 (클수록 빨리 따라가지만 흔들림)
+    plan.yaw_step_max: 0.02         # odom 요 오차 한 주기 최대 변화 [rad]
+    plan.track_heading_tol: 0.14    # 통로와 이 각도 [rad] 안으로 곧게 달릴 때만 요 오차·흐름·열 방향 갱신 (장애물 회피 중 멈춤)
+
+# --- 지역 경로계획 (nav_mode:=planner): DWA 로 전역 경로 추종 + LiDAR 장애물 회피 → /cmd_vel ---
+local_planner_node:
+  ros__parameters:
+    use_sim_time: true
+    debug_dir: /workspace/data/debug    # 'blocked' 가 이어지면 30 s 마다 자세·경로·장애물 점 npz 저장 (원인 분석용)
+    obstacle.h_min: 0.2             # 지면 위 이 높이부터 장애물 [m] (잔디 5~15 cm 제외)
+    obstacle.h_max: 0.75            # 이 높이까지 [m] (차체 높이 0.65 + 10 cm — 더 높은 처진 가지는 통과)
+    obstacle.nominal_ground_z: -0.1 # base_link 기준 평지 지면 z [m] (lidar_tree_node ground.nominal_z 와 같게)
+    dwa.max_speed: 0.8              # 통로 최고 속도 [m/s]
+    dwa.max_lat_accel: 0.15         # 휜 경로 가로 가속도 한계 [m/s²] → U턴 속도 약 0.5 m/s
+    dwa.safety: 0.15                # 차체(원 3개 근사)와 장애물 최소 여유 [m]
+    dwa.goal_lookahead: 1.5         # 경로 위 목표점 거리 [m] (작을수록 경로에 빨리 붙음)
+    dwa.escape_speed: 0.2           # 이미 safety 안으로 붙었을 때 멀어지는 궤적으로 빠져나오는 속도 [m/s]

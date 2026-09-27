@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>orchard_bringup</name>
+  <version>0.1.0</version>
+  <description>과수원 로버 실행 파일(launch)과 파라미터: 시뮬레이션 / 실차</description>
+  <maintainer email="pathcmd@gmail.com">UNIST BTS 유니주행차</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>orchard_msgs</exec_depend>
+  <exec_depend>orchard_description</exec_depend>
+  <exec_depend>orchard_perception</exec_depend>
+  <exec_depend>orchard_navigation</exec_depend>
+  <exec_depend>orchard_px4_bridge</exec_depend>
+  <exec_depend>orchard_gazebo</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <!-- 실차 전용 드라이버(livox_ros_driver2, realsense2_camera)와 foxglove_bridge 는
+       Docker 이미지에서 설치하며 시뮬레이션만 쓸 때는 없어도 된다. -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

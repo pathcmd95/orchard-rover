@@ -1,0 +1,26 @@
+orchard-rover (UNIST BTS 유니주행차)
+Copyright 2026 UNIST BTS 유니주행차 팀
+
+이 저장소의 코드는 Apache License 2.0 (LICENSE) 을 따릅니다.
+아래 제3자 구성요소는 각자의 라이선스를 따릅니다. 파일별 정리는 third_party/README.md.
+
+[저장소에 포함된 것]
+- models/trunk_yolo.onnx : Ultralytics YOLO11n (AGPL-3.0) 을 시뮬레이션 데이터로 학습해 내보낸 모델. AGPL-3.0 을 따릅니다.
+    라이선스 전문 models/LICENSE-AGPL-3.0.txt · 학습 스크립트 tools/training/train_yolo.py
+    Ultralytics 원본 소스 https://github.com/ultralytics/ultralytics
+    Ultralytics 는 학습한 모델과 그 모델을 쓰는 애플리케이션 전체에 AGPL-3.0 준수를 요구한다는 입장이므로
+    (https://www.ultralytics.com/license), 이 모델과 함께 배포되는 이 저장소·Docker 이미지 전체의 대응 소스를 공개합니다.
+    비공개·상용·장비 탑재 사용 시 주의 사항은 third_party/README.md.
+- models/orchard_seg.onnx : torchvision (BSD-3-Clause) 의 LR-ASPP + MobileNetV3-Small 구조로 학습한 모델.
+    학습 스크립트 tools/training/train_segmentation.py (기본 설정은 torchvision 의 ImageNet 사전학습 백본 가중치로 시작)
+- px4/airframes/51010_gz_orchard_rover : PX4-Autopilot v1.17.0 의 51000_gz_rover_ackermann 을 수정한 파일.
+    BSD-3-Clause, Copyright (c) 2012 - 2023, PX4 Development Team. 전문 third_party/licenses/PX4-Autopilot-BSD-3-Clause.txt
+- ros2_ws/src/orchard_bringup/config/MID360_config.json : livox_ros_driver2 1.2.6 의 예시 설정에서 IP 만 바꾼 파일.
+    MIT, Copyright (c) 2022 Livox. 전문 third_party/licenses/livox_ros_driver2-MIT.txt
+
+[실행할 때 읽거나 Docker 빌드 때 원본 저장소에서 받는 것]
+- PX4-Autopilot · PX4-gazebo-models · px4_msgs (BSD-3-Clause)
+    실행 시 PX4 의 rover_ackermann Gazebo 모델을 읽어 센서를 추가한 모델을 생성합니다. 원 모델의 저작권은 PX4 에 있습니다.
+- Micro-XRCE-DDS-Agent (Apache-2.0), ROS 2 Jazzy · Gazebo Harmonic (Apache-2.0), onnxruntime (MIT)
+- Livox-SDK2 · livox_ros_driver2 (MIT), realsense-ros (Apache-2.0) — 실로봇용 이미지에서만 사용
+각 구성요소의 라이선스 전문은 원본 저장소에 있고, Docker 이미지 안에서는 각 소스 폴더나 /usr/share/doc 에 있습니다.

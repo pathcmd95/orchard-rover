@@ -1,0 +1,81 @@
+#!/bin/sh
+# @name Orchard Ackermann Rover (UNIST BTS 유니주행차, Gazebo SITL)
+# @type Rover
+# @class Rover
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# 이 파일은 PX4-Autopilot v1.17.0 의 ROMFS/px4fmu_common/init.d-posix/airframes/51000_gz_rover_ackermann
+# ("Generic Ackermann Rover") 을 바탕으로 과수원 주행용 값만 바꾼 파생 SITL 에어프레임이다.
+#   원본 저작권: Copyright (c) 2012 - 2023, PX4 Development Team. All rights reserved.
+#   수정: UNIST BTS 유니주행차 팀, 2026 (월드·모델 이름, Ackermann·속도·요레이트 파라미터, 시뮬레이션 전용 설정)
+#   원본과 수정분 모두 BSD 3-Clause License 를 따른다 (저장소의 Apache-2.0 대상 아님).
+#   라이선스 전문: third_party/licenses/PX4-Autopilot-BSD-3-Clause.txt
+#
+# Gazebo 는 ROS 2 launch 가 먼저 띄우고, PX4 는 PX4_GZ_STANDALONE=1 로 붙는다
+# (orchard_bringup/launch/sim.launch.py 참고).
+# 설치 위치: PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/
+#   + 같은 폴더 CMakeLists.txt 에 파일명 추가 (docker/scripts/add_px4_airframe.sh 가 자동 처리)
+
+. ${R}etc/init.d/rc.rover_ackermann_defaults
+
+PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
+PX4_GZ_WORLD=${PX4_GZ_WORLD:=orchard}
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=orchard_rover}
+
+param set-default SIM_GZ_EN 1
+
+param set-default NAV_ACC_RAD 0.5
+
+# Ackermann 기하 (config/rover.yaml 의 wheelbase, 최대 조향각과 일치시킬 것)
+param set-default RA_WHEEL_BASE 0.5
+param set-default RA_ACC_RAD_GAIN 2
+param set-default RA_ACC_RAD_MAX 1.5
+param set-default RA_MAX_STR_ANG 0.5236
+param set-default RA_STR_RATE_LIM 360
+
+# 요레이트 제어
+param set-default RO_YAW_RATE_I 0.01
+param set-default RO_YAW_RATE_P 0.25
+param set-default RO_YAW_RATE_LIM 130
+param set-default RO_YAW_ACCEL_LIM 800
+param set-default RO_YAW_DECEL_LIM 800
+param set-default RO_YAW_RATE_CORR 1
+param set-default RO_YAW_EXPO 0.85
+param set-default RO_YAW_SUPEXPO 0.3
+
+# 자세 제어
+param set-default RO_YAW_P 3
+
+# 속도 제어 (과수원 주행은 저속: 최대 1.5 m/s 로 제한)
+param set-default RO_ACCEL_LIM 1.5
+param set-default RO_DECEL_LIM 3
+param set-default RO_JERK_LIM 5
+param set-default RO_MAX_THR_SPEED 3.1
+param set-default RO_SPEED_LIM 1.5
+param set-default RO_SPEED_I 0.01
+param set-default RO_SPEED_P 1
+param set-default RO_SPEED_RED 1
+
+# Pure Pursuit (PX4 내부 Position/Mission 모드용)
+param set-default PP_LOOKAHD_GAIN 1
+param set-default PP_LOOKAHD_MAX 10
+param set-default PP_LOOKAHD_MIN 1
+
+# 바퀴 / 조향 (PX4 rover_ackermann Gazebo 모델과 동일)
+param set-default SIM_GZ_WH_FUNC1 101
+param set-default SIM_GZ_WH_MIN1 70
+param set-default SIM_GZ_WH_MAX1 130
+param set-default SIM_GZ_WH_DIS1 100
+param set-default SIM_GZ_SV_MAXA1 30
+param set-default SIM_GZ_SV_MINA1 -30
+param set-default CA_SV_CS_COUNT 1
+param set-default SIM_GZ_SV_FUNC1 201
+param set-default SIM_GZ_SV_REV 1
+
+# --- 시뮬레이션 전용: 조종기(RC)·지상국 없이 ROS 2 Offboard 로만 구동 ---
+# 실차에서는 절대 쓰지 말 것 (실차는 RC 킬스위치 필수, docs/03 참고)
+param set-default COM_RC_IN_MODE 4      # 수동 조종 입력 비활성
+param set-default NAV_DLL_ACT 0         # 지상국 링크 손실 시 동작 없음
+param set-default COM_OF_LOSS_T 1.0     # Offboard 신호 1초 끊기면
+param set-default COM_OBL_RC_ACT 5      # → Hold
+param set-default COM_ARM_WO_GPS 0     # GPS 검사 실패 시 시동 거부
